@@ -197,3 +197,4 @@ MIT License
 
 Built for the **Cronos x402 Paytech Hackathon**  
 Powered by: Cronos, USDC, Gemini AI, Facilitator SDK
+# creator-connect-cronos
