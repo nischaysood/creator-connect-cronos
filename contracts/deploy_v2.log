@@ -1,0 +1,35 @@
+Compiled 1 Solidity file successfully (evm target: paris).
+
+=================================================
+🚀 STARTING FULL TEST SETUP
+=================================================
+
+👤 Accounts:
+   Account #0 (Deployer/Brand): 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+   Account #1 (Creator):        0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+
+-------------------------------------------------
+📦 Deploying Contracts...
+   ✅ MockMNEE Deployed at:     0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44
+-------------------------------------------------
+!!! DEPLOYMENT DETAILS (SAVE THESE) !!!
+MOCK_MNEE: 0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44
+ESCROW:    0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f
+-------------------------------------------------
+
+-------------------------------------------------
+💰 Minting Test Tokens...
+   ✅ Minted 10000.0 MNEE to Brand (0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266)
+   ✅ Minted 10000.0 MNEE to Creator (0x70997970C51812dc3A010C7d01b50e0d17dc79C8)
+
+-------------------------------------------------
+⚙️  Frontend Configuration
+   Copy these values to frontend/src/constants/index.ts:
+
+   export const MOCK_MNEE_ADDRESS = "0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44";
+   export const ESCROW_ADDRESS = "0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f";
+
+=================================================
+✅ SETUP COMPLETE
+=================================================
+
