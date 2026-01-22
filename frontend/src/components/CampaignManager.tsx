@@ -153,7 +153,7 @@ export function CampaignManager({ id, campaign, onClose, onRefetch }: CampaignMa
             address: ESCROW_ADDRESS,
             abi: ESCROW_ABI,
             functionName: "verifyAndRelease",
-            args: [BigInt(id), creatorAddress as `0x${string}`, true],
+            args: [BigInt(id), creatorAddress as `0x${string}`, true, BigInt(100)],
         });
     };
 
