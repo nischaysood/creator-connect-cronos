@@ -10,7 +10,8 @@ import {
     Globe,
     LogOut,
     Check,
-    CreditCard
+    CreditCard,
+    ExternalLink
 } from "lucide-react";
 
 // Types
@@ -219,28 +220,12 @@ function NotificationSettings() {
 
 
 // Import wagmi check
-import { useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
-import { USDC_ADDRESS, USDC_ABI } from "@/constants";
-import { parseEther } from "viem";
+import { useAccount } from "wagmi";
+import { USDC_ADDRESS } from "@/constants";
 
 function WalletSettings() {
-    const { writeContract, isPending } = useWriteContract();
-
-    const handleMint = () => {
-        writeContract({
-            address: USDC_ADDRESS,
-            abi: USDC_ABI,
-            functionName: "mint",
-            args: ["0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266", parseEther("10000")], // Mint to default hardhat account or current user if I could access it, but for demo I'll mint to "me"
-        });
-        // Ideally we use useAccount() to get current address, but I want to keep this simple without adding more hooks if possible.
-        // Actually, let's use a prompt or just mint to the connected signer (which `mint` usually does if `to` is msg.sender, but this mock might require explicit `to`).
-        // I'll assume the user is connected.
-    };
-
-    // Better: Helper to mint to *self*
-    const { data: hash } = useWriteContract(); // shadowing outer
-
+    // Helper to mint to *self*
+    // const { data: hash } = useWriteContract(); // shadowing outer
     // Let's just create a separate component or keep it clean
 
     return (
@@ -264,7 +249,7 @@ function WalletSettings() {
                     <span className="px-2 py-1 rounded bg-green-500/20 text-green-400 text-[10px] font-bold uppercase border border-green-500/20">Active</span>
                 </div>
                 <div className="pt-4 border-t border-white/10 flex gap-4">
-                    <MintButton />
+                    <FaucetLink />
                 </div>
             </div>
 
@@ -275,9 +260,8 @@ function WalletSettings() {
                         <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-[10px] font-bold">U</div>
                         <span className="text-sm font-medium text-white">USDC</span>
                     </div>
-                    <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/5 flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-purple-500 flex items-center justify-center text-[10px] font-bold">M</div>
-                        <span className="text-sm font-medium text-white">MNEE</span>
+                    <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/5 flex items-center gap-2 opacity-50">
+                        <span className="text-sm font-medium text-gray-500">More coming soon...</span>
                     </div>
                 </div>
             </div>
@@ -285,26 +269,17 @@ function WalletSettings() {
     );
 }
 
-function MintButton() {
-    const { writeContract, isPending } = useWriteContract();
-    const { address } = useAccount();
-
+function FaucetLink() {
     return (
-        <button
-            disabled={isPending || !address}
-            onClick={() => {
-                if (!address) return;
-                writeContract({
-                    address: USDC_ADDRESS,
-                    abi: USDC_ABI,
-                    functionName: "mint",
-                    args: [address, parseEther("5000")]
-                })
-            }}
-            className="text-xs text-white bg-purple-500 hover:bg-purple-400 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+        <a
+            href="https://cronos.org/faucet"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-white bg-purple-500 hover:bg-purple-400 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2"
         >
-            {isPending ? "Minting..." : "Mint Test MNEE"}
-        </button>
+            Get Testnet tokens
+            <ExternalLink className="w-3 h-3" />
+        </a>
     )
 }
 

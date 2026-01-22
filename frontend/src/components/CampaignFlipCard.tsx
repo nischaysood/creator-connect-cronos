@@ -16,8 +16,9 @@ import {
     ArrowRight,
     ExternalLink
 } from "lucide-react";
-import { formatEther } from "viem";
+import { formatEther, formatUnits } from "viem";
 import { cn } from "@/lib/utils";
+import { USDC_DECIMALS } from "@/constants";
 import SubmitWorkModal from "./SubmitWorkModal";
 import { calculateMatchScore, getMatchColor } from "@/lib/matchingEngine";
 
@@ -154,7 +155,7 @@ export function CampaignCard({ id, campaign, role, isEnrolled, onJoin, onSubmit 
                     <div className="mb-4">
                         <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-1">Reward per Creator</div>
                         <div className="text-3xl font-bold text-white font-outfit tracking-tight">
-                            {formatEther(reward)} <span className={cn("text-lg", accentText)}>MNEE</span>
+                            {formatUnits(reward, USDC_DECIMALS)} <span className={cn("text-lg", accentText)}>USDC</span>
                         </div>
                     </div>
                 </div>

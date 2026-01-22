@@ -253,7 +253,8 @@ export const ESCROW_ABI = [
         "inputs": [
             { "internalType": "uint256", "name": "_campaignId", "type": "uint256" },
             { "internalType": "address", "name": "_creator", "type": "address" },
-            { "internalType": "bool", "name": "_isValid", "type": "bool" }
+            { "internalType": "bool", "name": "_isValid", "type": "bool" },
+            { "internalType": "uint256", "name": "_payoutPercent", "type": "uint256" }
         ],
         "name": "verifyAndRelease",
         "outputs": [],

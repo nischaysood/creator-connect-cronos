@@ -20,8 +20,8 @@ import {
     Loader2
 } from "lucide-react";
 import { useReadContracts, useAccount } from "wagmi";
-import { ESCROW_ADDRESS, ESCROW_ABI } from "@/constants";
-import { formatEther } from "viem";
+import { ESCROW_ADDRESS, ESCROW_ABI, USDC_DECIMALS } from "@/constants";
+import { formatUnits } from "viem";
 
 interface CalendarEvent {
     id: string | number;
@@ -112,7 +112,7 @@ export function ContentCalendar({ role = 'brand' }: { role?: 'brand' | 'creator'
                 platform = parsed.platform || platform;
             } catch { }
 
-            const reward = formatEther(c[3]);
+            const reward = formatUnits(c[3], USDC_DECIMALS);
             const now = Date.now() / 1000;
 
             // Brand events
@@ -183,7 +183,7 @@ export function ContentCalendar({ role = 'brand' }: { role?: 'brand' | 'creator'
                             day: today.getDate(),
                             month: today.getMonth(),
                             year: today.getFullYear(),
-                            title: `💰 Paid: ${reward} MNEE`,
+                            title: `💰 Paid: ${reward} USDC`,
                             type: 'payment',
                             platform,
                             status: 'done',

@@ -10,8 +10,9 @@ import {
     Wallet,
     Loader2
 } from "lucide-react";
-import { formatEther } from "viem";
+import { formatEther, formatUnits } from "viem";
 import { cn } from "@/lib/utils";
+import { USDC_DECIMALS } from "@/constants";
 import SubmitWorkModal from "./SubmitWorkModal";
 
 interface CreatorEnrollmentsProps {
@@ -62,7 +63,7 @@ export function CreatorEnrollments({ enrollments, onRefetch }: CreatorEnrollment
                                     </div>
                                     <div className="min-w-0">
                                         <h4 className="font-bold text-white text-sm truncate">{meta.name}</h4>
-                                        <span className="text-cyan-400 font-bold text-xs">{formatEther(campaign.rewardPerCreator)} MNEE</span>
+                                        <span className="text-cyan-400 font-bold text-xs">{formatUnits(campaign.rewardPerCreator, USDC_DECIMALS)} USDC</span>
                                     </div>
                                 </div>
 

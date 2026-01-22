@@ -17,8 +17,8 @@ import {
 } from "lucide-react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useReadContract } from "wagmi";
-import { formatEther } from "viem";
-import { USDC_ADDRESS, USDC_ABI } from "@/constants";
+import { formatUnits } from "viem";
+import { USDC_ADDRESS, USDC_ABI, USDC_DECIMALS } from "@/constants";
 
 const mainNav = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -77,16 +77,16 @@ export function Sidebar() {
         }
     }, [address, isConnected]);
 
-    // MNEE Balance Fetch
-    const { data: mneeData } = useReadContract({
+    // USDC Balance Fetch
+    const { data: usdcData } = useReadContract({
         address: USDC_ADDRESS as `0x${string}`,
         abi: USDC_ABI,
         functionName: 'balanceOf',
         args: address ? [address] : undefined,
     });
 
-    // Format balance (18 decimals)
-    const mneeBalance = mneeData ? Number(formatEther(mneeData as bigint)).toFixed(0) : '0';
+    // Format balance (6 decimals for USDC)
+    const usdcBalance = usdcData ? Number(formatUnits(usdcData as bigint, USDC_DECIMALS)).toFixed(2) : '0.00';
 
     const navItems = mainNav.map(item => {
         if (item.name === "Creators" && role === "creator") {
@@ -259,7 +259,7 @@ export function Sidebar() {
                                                             {account.displayBalance ? `${account.displayBalance} ETH` : ''}
                                                         </span>
                                                         <span className="text-[10px] text-emerald-400 font-bold truncate block">
-                                                            {mneeBalance} MNEE
+                                                            {usdcBalance} USDC
                                                         </span>
                                                     </div>
                                                 </div>

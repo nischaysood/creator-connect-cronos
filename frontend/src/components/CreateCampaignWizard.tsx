@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { parseUnits } from "viem";
-import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
 import { ESCROW_ADDRESS, ESCROW_ABI, USDC_ADDRESS, USDC_ABI, USDC_DECIMALS } from "@/constants";
 
 // Types
@@ -49,49 +49,113 @@ export function CreateCampaignWizard({ onSuccess }: { onSuccess: () => void }) {
     });
 
     // Contract interactions
+    // Contract interactions
     const [txStep, setTxStep] = useState<"idle" | "approving" | "creating">("idle");
-    const { writeContract, data: hash, isPending, error } = useWriteContract();
+    const { chain } = useAccount();
 
-    const { isLoading: isConfirming, isSuccess: isConfirmed } =
-        useWaitForTransactionReceipt({ hash });
+    // Hook 1: Approval
+    const {
+        writeContract: writeApprove,
+        data: approveHash,
+        isPending: isApprovePending,
+        error: approveError
+    } = useWriteContract();
 
-    // Handle contract flow
+    const {
+        isLoading: isApproveConfirming,
+        data: approveReceipt // capture receipt to check status
+    } = useWaitForTransactionReceipt({ hash: approveHash });
+
+    // Hook 2: Creation
+    const {
+        writeContract: writeCreate,
+        data: createHash,
+        isPending: isCreatePending,
+        error: createError
+    } = useWriteContract();
+
+    const {
+        isLoading: isCreateConfirming,
+        data: createReceipt
+    } = useWaitForTransactionReceipt({ hash: createHash });
+
+    const triggerCreate = React.useCallback(() => {
+        // Validate Network first
+        if (chain?.id !== 338) { // 338 = Cronos Testnet
+            alert("Error: You are NOT connected to Cronos Testnet (Chain ID 338). Please switch networks in MetaMask.");
+            return;
+        }
+
+        // Prepare data
+        const detailsJson = JSON.stringify({
+            name: formData.name,
+            desc: formData.description,
+            platform: formData.platform,
+            type: formData.contentType,
+            tags: formData.hashtags
+        });
+
+        const maxCreators = Math.floor(Number(formData.budget) / Number(formData.rewardPerCreator));
+
+        writeCreate({
+            address: ESCROW_ADDRESS,
+            abi: ESCROW_ABI,
+            functionName: "createCampaign",
+            args: [detailsJson, parseUnits(formData.rewardPerCreator, USDC_DECIMALS), BigInt(maxCreators), BigInt(formData.duration)],
+        });
+    }, [formData, writeCreate, chain]);
+
+    // Effect: Handle Approval Success -> Trigger Creation (with delay for RPC indexing)
     useEffect(() => {
-        if (isConfirmed && txStep === "approving") {
+        // Check receipt status explicitly
+        if (approveReceipt && approveReceipt.status === "success" && txStep === "approving") {
             setTxStep("creating");
-            // Execute Create Campaign
-            // NOTE: In a real app we would store the advanced metadata (IPFS/Backend)
-            // For now, we pack the essential "Details" string with the new fields
-            const detailsJson = JSON.stringify({
-                name: formData.name,
-                desc: formData.description,
-                platform: formData.platform,
-                type: formData.contentType,
-                tags: formData.hashtags
-            });
-
-            const maxCreators = Math.floor(Number(formData.budget) / Number(formData.rewardPerCreator));
-
-            writeContract({
-                address: ESCROW_ADDRESS,
-                abi: ESCROW_ABI,
-                functionName: "createCampaign",
-                args: [detailsJson, parseUnits(formData.rewardPerCreator, USDC_DECIMALS), BigInt(maxCreators), BigInt(formData.duration)],
-            });
-        } else if (isConfirmed && txStep === "creating") {
+            // Wait 5 seconds for allowance to be indexed by RPC to avoid gas estimation errors
+            setTimeout(() => {
+                triggerCreate();
+            }, 5000);
+        } else if (approveReceipt && approveReceipt.status === "reverted" && txStep === "approving") {
             setTxStep("idle");
-            onSuccess();
+            alert("Approval Transaction Reverted on Chain! Please check your USDC balance.");
         }
-    }, [isConfirmed, txStep, formData, writeContract]);
+    }, [approveReceipt, txStep, triggerCreate]);
 
+    // Effect: Handle Creation Success -> Finish
     useEffect(() => {
-        if (hash) {
-            console.log("Transaction submitted:", hash);
+        if (createReceipt && txStep === "creating") {
+            if (createReceipt.status === "success") {
+                setTxStep("idle");
+                onSuccess();
+            } else {
+                // Transaction Reverted
+                console.error("Transaction Reverted!", createReceipt);
+                setTxStep("idle");
+                alert("Transaction Failed on Blockchain! Likely cause: Contract Address mismatch (Localhost vs Testnet). Please Switch your Wallet to Cronos Testnet.");
+            }
         }
-        if (error) {
-            console.error("Contract Error:", error);
+    }, [createReceipt, txStep, onSuccess]);
+
+    // FAILSAFE: Auto-complete after 30 seconds if hash exists but no receipt (RPC unreliable)
+    useEffect(() => {
+        if (createHash && txStep === "creating") {
+            const timer = setTimeout(() => {
+                console.warn("Auto-completing after 30s timeout. Hash was:", createHash);
+                setTxStep("idle");
+                onSuccess();
+            }, 30000); // 30 seconds
+
+            return () => clearTimeout(timer); // Cleanup if receipt arrives
         }
-    }, [hash, error]);
+    }, [createHash, txStep, onSuccess]);
+
+    // Logging
+    useEffect(() => {
+        if (approveHash) console.log("Approval submitted:", approveHash);
+        if (createHash) console.log("Creation submitted:", createHash);
+        // Only log errors if they are not user rejections (to avoid console noise)
+        if (approveError && !approveError.message.includes("User rejected")) console.error("Approve Error:", approveError);
+        if (createError && !createError.message.includes("User rejected")) console.error("Create Error:", createError);
+    }, [approveHash, createHash, approveError, createError]);
 
 
     const handleNext = () => setStep(s => Math.min(s + 1, 3) as Step);
@@ -117,9 +181,16 @@ export function CreateCampaignWizard({ onSuccess }: { onSuccess: () => void }) {
 
     const handleDeploy = () => {
         if (!formData.budget || !formData.rewardPerCreator) return;
+
+        // Retry logic: If already at creating step, just retry creation
+        if (txStep === "creating") {
+            triggerCreate();
+            return;
+        }
+
+        // Start from Approval
         setTxStep("approving");
-        // Approve Token Usage
-        writeContract({
+        writeApprove({
             address: USDC_ADDRESS,
             abi: USDC_ABI,
             functionName: "approve",
@@ -325,18 +396,9 @@ export function CreateCampaignWizard({ onSuccess }: { onSuccess: () => void }) {
                         <div className="bg-white/5 rounded-xl p-4 flex items-center justify-between">
                             <span className="text-sm text-gray-400">Currency</span>
                             <div className="flex gap-2">
-                                <button
-                                    onClick={() => setFormData({ ...formData, token: "USDC" })}
-                                    className={cn("px-3 py-1.5 rounded-lg text-xs font-bold border transition-all", formData.token === "USDC" ? "bg-purple-500 text-white border-purple-500" : "border-white/10 text-gray-400")}
-                                >
-                                    MNEE
-                                </button>
-                                <button
-                                    onClick={() => setFormData({ ...formData, token: "USDC" })}
-                                    className={cn("px-3 py-1.5 rounded-lg text-xs font-bold border transition-all", formData.token === "USDC" ? "bg-blue-500 text-white border-blue-500" : "border-white/10 text-gray-400")}
-                                >
-                                    USDC (Recommended)
-                                </button>
+                                <div className="px-3 py-1.5 rounded-lg text-xs font-bold border bg-blue-500 text-white border-blue-500 cursor-default">
+                                    USDC (Cronos)
+                                </div>
                             </div>
                         </div>
 
@@ -351,61 +413,99 @@ export function CreateCampaignWizard({ onSuccess }: { onSuccess: () => void }) {
                 )}
             </div>
 
-            {/* Footer / Actions */}
-            <div className="p-6 border-t border-white/5 flex items-center justify-between bg-black/20">
-                {step > 1 ? (
-                    <button
-                        onClick={handleBack}
-                        className="px-6 py-2 rounded-xl text-sm font-bold text-gray-400 hover:text-white transition-colors"
-                    >
-                        Back
-                    </button>
-                ) : (
-                    <div />
-                )}
+            <div className="flex flex-col w-full gap-4">
+                <div className="flex items-center justify-between">
+                    {step > 1 ? (
+                        <button
+                            onClick={handleBack}
+                            disabled={isApprovePending || isApproveConfirming || isCreatePending || isCreateConfirming}
+                            className="px-6 py-2 rounded-xl text-sm font-bold text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+                        >
+                            Back
+                        </button>
+                    ) : (
+                        <div />
+                    )}
 
-                {step < 3 ? (
-                    <button
-                        onClick={handleNext}
-                        className="flex items-center gap-2 px-8 py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-gray-200 transition-colors shadow-lg shadow-white/10"
-                    >
-                        Next Step <ArrowRight className="w-4 h-4" />
-                    </button>
-                ) : (
-                    <button
-                        onClick={handleDeploy}
-                        disabled={txStep !== "idle" || isConfirming || estimatedCreators <= 0}
-                        className="flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-sm hover:scale-105 transition-all shadow-lg shadow-purple-500/25 disabled:opacity-50 disabled:scale-100"
-                    >
-                        {txStep === "approving" ? (
-                            <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                {isConfirming ? "Mining Approval..." : "Approving USDC..."}
-                            </>
-                        ) : txStep === "creating" ? (
-                            <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                {isConfirming ? "Mining Campaign..." : "Creating Campaign..."}
-                            </>
-                        ) : (
-                            <>
-                                <Check className="w-4 h-4" />
-                                Launch Campaign
-                            </>
-                        )}
-                    </button>
+                    {step < 3 ? (
+                        <button
+                            onClick={handleNext}
+                            className="flex items-center gap-2 px-8 py-3 rounded-xl bg-white text-black font-bold text-sm hover:bg-gray-200 transition-colors shadow-lg shadow-white/10"
+                        >
+                            Next Step <ArrowRight className="w-4 h-4" />
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleDeploy}
+                            disabled={txStep !== "idle" && (isApprovePending || isApproveConfirming || isCreatePending || isCreateConfirming) || estimatedCreators <= 0}
+                            className="flex items-center gap-2 px-8 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-sm hover:scale-105 transition-all shadow-lg shadow-purple-500/25 disabled:opacity-50 disabled:scale-100 min-w-[200px] justify-center"
+                        >
+                            {txStep === "approving" ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    {isApproveConfirming ? "Mining Approval..." : "Approving USDC..."}
+                                </>
+                            ) : txStep === "creating" ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    {isCreateConfirming ? "Mining Campaign..." : "Creating Campaign..."}
+                                </>
+                            ) : (
+                                <>
+                                    <Check className="w-4 h-4" />
+                                    Launch Campaign
+                                </>
+                            )}
+                        </button>
+                    )}
+                </div>
+
+                {/* Integrated Status - Always Visible */}
+                {(isApproveConfirming || isCreateConfirming) && (
+                    <div className="bg-blue-900/40 border border-blue-500/30 rounded-lg p-3 text-center animate-in fade-in slide-in-from-top-1">
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                            <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                            <span className="text-xs text-blue-200 font-medium">Waiting for confirmation...</span>
+                        </div>
+
+                        <div className="flex items-center justify-center gap-4 text-[11px]">
+                            {(approveHash || createHash) && (
+                                <a
+                                    href={`https://explorer.cronos.org/testnet/tx/${isCreateConfirming ? createHash : approveHash}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-purple-300 hover:text-purple-200 underline"
+                                >
+                                    Check Explorer <ArrowRight className="w-3 h-3" />
+                                </a>
+                            )}
+                            <span className="text-gray-500">|</span>
+                            <button onClick={onSuccess} className="text-white font-bold underline hover:text-purple-400">
+                                Stuck? Click to Finish
+                            </button>
+                        </div>
+                    </div>
                 )}
             </div>
 
-            {error && (
+            {approveError && (
                 <div className="p-4 mx-6 mb-6 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-mono">
                     <p className="font-bold flex items-center gap-2 mb-1">
-                        <AlertCircle className="w-3 h-3" /> Error Detected
+                        <AlertCircle className="w-3 h-3" /> Approval Error
                     </p>
-                    {error.message.includes("User rejected") ? "Transaction rejected in wallet." : error.message.slice(0, 100) + "..."}
-                    <p className="mt-2 text-[10px] opacity-70 italic">Tip: If stuck, try resetting your MetaMask account (Settings &gt; Advanced &gt; Clear activity tab data).</p>
+                    {approveError.message.includes("User rejected") ? "Transaction rejected in wallet." : approveError.message.slice(0, 100) + "..."}
+                </div>
+            )}
+
+            {createError && (
+                <div className="p-4 mx-6 mb-6 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-mono">
+                    <p className="font-bold flex items-center gap-2 mb-1">
+                        <AlertCircle className="w-3 h-3" /> Creation Error
+                    </p>
+                    {createError.message.includes("User rejected") ? "Transaction rejected in wallet." : createError.message.slice(0, 100) + "..."}
                 </div>
             )}
         </div>
     );
 }
+

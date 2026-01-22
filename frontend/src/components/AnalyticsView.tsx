@@ -32,8 +32,8 @@ import {
     Target
 } from "lucide-react";
 import { useReadContracts, useAccount } from "wagmi";
-import { ESCROW_ADDRESS, ESCROW_ABI } from "@/constants";
-import { formatEther } from "viem";
+import { ESCROW_ADDRESS, ESCROW_ABI, USDC_DECIMALS } from "@/constants";
+import { formatEther, formatUnits } from "viem";
 
 // --- Platform Data ---
 const PLATFORM_DATA = [
@@ -76,8 +76,8 @@ const StatCard = ({ title, value, change, isPositive, icon: Icon, color, isLoadi
 // --- Brand Analytics Component ---
 function BrandAnalytics({ analytics, isLoading, chartData }: any) {
     const [timeRange, setTimeRange] = useState("7d");
-    const totalSpent = Number(formatEther(analytics.totalPaid || BigInt(0)));
-    const totalEscrowed = Number(formatEther(BigInt(analytics.totalDeposited || 0) - BigInt(analytics.totalPaid || 0)));
+    const totalSpent = Number(formatUnits(analytics.totalPaid || BigInt(0), USDC_DECIMALS));
+    const totalEscrowed = Number(formatUnits(BigInt(analytics.totalDeposited || 0) - BigInt(analytics.totalPaid || 0), USDC_DECIMALS));
 
     return (
         <div className="space-y-6">
@@ -124,7 +124,7 @@ function BrandAnalytics({ analytics, isLoading, chartData }: any) {
                 />
                 <StatCard
                     title="Total Spent"
-                    value={`${totalSpent.toFixed(0)} MNEE`}
+                    value={`${totalSpent.toFixed(0)} USDC`}
                     change="Paid out"
                     isPositive={false}
                     icon={DollarSign}
@@ -133,7 +133,7 @@ function BrandAnalytics({ analytics, isLoading, chartData }: any) {
                 />
                 <StatCard
                     title="In Escrow"
-                    value={`${totalEscrowed.toFixed(0)} MNEE`}
+                    value={`${totalEscrowed.toFixed(0)} USDC`}
                     change="Locked"
                     isPositive={true}
                     icon={Wallet}
@@ -232,8 +232,8 @@ function BrandAnalytics({ analytics, isLoading, chartData }: any) {
                                     <tr key={c.id} className="hover:bg-white/5 border-b border-white/5">
                                         <td className="p-4 font-bold text-white">{c.name}</td>
                                         <td className="p-4 text-gray-300">{c.creators}/{c.maxCreators}</td>
-                                        <td className="p-4 text-white">{c.deposited} MNEE</td>
-                                        <td className="p-4 text-emerald-400">{c.paid} MNEE</td>
+                                        <td className="p-4 text-white">{c.deposited} USDC</td>
+                                        <td className="p-4 text-emerald-400">{c.paid} USDC</td>
                                         <td className="p-4">
                                             <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${c.isActive ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-gray-500/10 text-gray-400 border border-gray-500/20'}`}>
                                                 {c.isActive ? 'Active' : 'Ended'}
@@ -348,7 +348,7 @@ function CreatorAnalytics({ analytics, isLoading }: any) {
                 />
                 <StatCard
                     title="Total Earned"
-                    value={`${analytics.totalEarned.toFixed(0)} MNEE`}
+                    value={`${analytics.totalEarned.toFixed(0)} USDC`}
                     change="Verified payouts"
                     isPositive={true}
                     icon={DollarSign}
@@ -380,7 +380,7 @@ function CreatorAnalytics({ analytics, isLoading }: any) {
                     <Award size={18} className="text-emerald-400" />
                     Earnings History
                     <span className="ml-auto text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20">
-                        +{analytics.totalEarned.toFixed(0)} MNEE Total
+                        +{analytics.totalEarned.toFixed(0)} USDC Total
                     </span>
                 </h3>
                 <div className="h-[300px] w-full relative z-10">
@@ -395,7 +395,7 @@ function CreatorAnalytics({ analytics, isLoading }: any) {
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                             <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                            <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${v} MNEE`} />
+                            <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${v} USDC`} />
                             <Tooltip
                                 contentStyle={{
                                     backgroundColor: 'rgba(15, 23, 42, 0.95)',
@@ -403,7 +403,7 @@ function CreatorAnalytics({ analytics, isLoading }: any) {
                                     border: '1px solid rgba(16, 185, 129, 0.2)',
                                     backdropFilter: 'blur(10px)'
                                 }}
-                                formatter={(value) => [`${value} MNEE`, 'Earned']}
+                                formatter={(value) => [`${value} USDC`, 'Earned']}
                                 labelStyle={{ color: '#94a3b8' }}
                             />
                             <Area
@@ -442,7 +442,7 @@ function CreatorAnalytics({ analytics, isLoading }: any) {
                                 analytics.submissions.map((s: any, i: number) => (
                                     <tr key={i} className="hover:bg-white/5 border-b border-white/5">
                                         <td className="p-4 font-bold text-white">{s.campaignName}</td>
-                                        <td className="p-4 text-gray-300">{s.reward} MNEE</td>
+                                        <td className="p-4 text-gray-300">{s.reward} USDC</td>
                                         <td className="p-4">
                                             <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${s.isPaid ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                                                 s.isVerified ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
@@ -451,7 +451,7 @@ function CreatorAnalytics({ analytics, isLoading }: any) {
                                                 {s.isPaid ? 'Paid' : s.isVerified ? 'Verified' : 'Pending'}
                                             </span>
                                         </td>
-                                        <td className="p-4 text-emerald-400 font-bold">{s.isPaid ? `${s.reward} MNEE` : '-'}</td>
+                                        <td className="p-4 text-emerald-400 font-bold">{s.isPaid ? `${s.reward} USDC` : '-'}</td>
                                     </tr>
                                 ))
                             )}
@@ -532,8 +532,8 @@ export function AnalyticsView({ role = 'brand' }: { role?: 'brand' | 'creator' }
                     id: i, name,
                     creators: enrollments.length,
                     maxCreators: Number(c[4]),
-                    deposited: Number(formatEther(c[5])).toFixed(0),
-                    paid: Number(formatEther(c[6])).toFixed(0),
+                    deposited: Number(formatUnits(c[5], USDC_DECIMALS)).toFixed(0),
+                    paid: Number(formatUnits(c[6], USDC_DECIMALS)).toFixed(0),
                     isActive: c[7]
                 });
             }
@@ -576,7 +576,7 @@ export function AnalyticsView({ role = 'brand' }: { role?: 'brand' | 'creator' }
 
             if (myEnrollment && c) {
                 joinedCampaigns++;
-                const reward = Number(formatEther(c[3]));
+                const reward = Number(formatUnits(c[3], USDC_DECIMALS));
 
                 let campaignName = `Campaign #${i}`;
                 try { campaignName = JSON.parse(c[2]).name || campaignName; } catch { }
@@ -607,7 +607,7 @@ export function AnalyticsView({ role = 'brand' }: { role?: 'brand' | 'creator' }
     // Chart data for brand
     const chartData = useMemo(() => {
         const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        const total = Number(formatEther(brandAnalytics.totalDeposited));
+        const total = Number(formatUnits(brandAnalytics.totalDeposited, USDC_DECIMALS));
         return days.map((name, i) => ({
             name,
             views: Math.floor((total / 7) * (1 + Math.sin(i) * 0.5) * 100),

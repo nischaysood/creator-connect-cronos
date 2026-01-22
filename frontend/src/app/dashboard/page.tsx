@@ -25,9 +25,10 @@ import {
     useWriteContract,
     useReadContracts,
     useWaitForTransactionReceipt,
+    useWatchContractEvent,
 } from "wagmi";
-import { formatEther } from "viem";
-import { ESCROW_ADDRESS, ESCROW_ABI, USDC_ADDRESS, USDC_ABI } from "@/constants";
+import { formatUnits } from "viem";
+import { ESCROW_ADDRESS, ESCROW_ABI, USDC_ADDRESS, USDC_ABI, USDC_DECIMALS } from "@/constants";
 import { CreatorEnrollments } from "@/components/CreatorEnrollments";
 
 function DashboardContent() {
@@ -113,7 +114,7 @@ function DashboardContent() {
     });
 
     // 3. User Balance
-    const { data: mneeBalance, refetch: refetchBalance } = useReadContract({
+    const { data: usdcBalance, refetch: refetchBalance } = useReadContract({
         address: USDC_ADDRESS as `0x${string}`,
         abi: USDC_ABI,
         functionName: "balanceOf",
@@ -166,8 +167,21 @@ function DashboardContent() {
 
     const activeJobsCount = userEnrollments.filter(j => !j.enrollment.isPaid).length;
 
-    // Handle Transactions
+    // Handle Transactions & Events
     const { isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
+
+    // Watch for Campaign Creation (Global Sync)
+    useWatchContractEvent({
+        address: ESCROW_ADDRESS as `0x${string}`,
+        abi: ESCROW_ABI,
+        eventName: 'CampaignCreated',
+        onLogs(logs) {
+            console.log('Campaign Created Event detected!', logs);
+            refetchCount();
+            refetchCampaigns();
+            refetchBalance();
+        },
+    });
 
     useEffect(() => {
         if (isConfirmed) {
@@ -203,6 +217,8 @@ function DashboardContent() {
                     campaign[0] = BigInt(idx);
                     return campaign;
                 }
+                // Log missing result if index < count
+                if (process.env.NODE_ENV === 'development') console.log(`Campaign ${idx} data missing:`, res);
                 return null;
             })
             .filter((c: any) => {
@@ -286,11 +302,12 @@ function DashboardContent() {
                             onClick={() => setIsWizardOpen(false)}
                         />
                         <div className="relative z-10 w-full max-w-2xl animate-in fade-in zoom-in-95 duration-200 h-[90vh] overflow-y-auto">
-                            <CreateCampaignWizard onSuccess={() => {
+                            <CreateCampaignWizard onSuccess={async () => {
                                 setIsWizardOpen(false);
-                                refetchCount();
-                                refetchCampaigns();
-                                alert("Campaign Launched Successfully!");
+                                console.log("Wizard success. Refetching...");
+                                await refetchCount();
+                                // We don't await refetchCampaigns because the count update will trigger a new fetch cycle anyway
+                                alert("Campaign Launched Successfully! Dashboard will update shortly.");
                             }} />
                             <button
                                 onClick={() => setIsWizardOpen(false)}
@@ -343,7 +360,7 @@ function DashboardContent() {
                             />
                             <StatCard
                                 title="Wallet Balance"
-                                value={`${mneeBalance ? Number(formatEther(mneeBalance as bigint)).toFixed(2) : '0'} MNEE`}
+                                value={`${usdcBalance ? Number(formatUnits(usdcBalance as bigint, USDC_DECIMALS)).toFixed(2) : '0.00'} USDC`}
                                 icon={<Wallet className="w-5 h-5 text-purple-500" />}
                             />
                             <StatCard
@@ -357,7 +374,7 @@ function DashboardContent() {
                         <>
                             <StatCard
                                 title="Total Earned"
-                                value={`${Number(formatEther(totalEarned)).toFixed(0)} MNEE`}
+                                value={`${Number(formatUnits(totalEarned, USDC_DECIMALS)).toFixed(2)} USDC`}
                                 trend={{ value: "Lifetime", isUp: true }}
                                 icon={<TrendingUp className="w-5 h-5 text-emerald-400" />}
                             />
@@ -369,7 +386,7 @@ function DashboardContent() {
                             />
                             <StatCard
                                 title="Wallet Balance"
-                                value={`${mneeBalance ? Number(formatEther(mneeBalance as bigint)).toFixed(0) : '0'} MNEE`}
+                                value={`${usdcBalance ? Number(formatUnits(usdcBalance as bigint, USDC_DECIMALS)).toFixed(2) : '0.00'} USDC`}
                                 trend={{ value: "Available", isUp: true }}
                                 icon={<Wallet className="w-5 h-5 text-cyan-400" />}
                             />
@@ -411,6 +428,13 @@ function DashboardContent() {
                                     New Campaign
                                 </button>
                             )}
+                            <button
+                                onClick={() => { refetchCount(); refetchCampaigns(); refetchBalance(); }}
+                                className="p-2.5 bg-white/5 text-white rounded-xl hover:bg-white/10 transition-colors"
+                                title="Refresh Data"
+                            >
+                                <TrendingUp className="w-4 h-4" />
+                            </button>
                         </div>
 
                         {isLoading ? (

@@ -524,6 +524,7 @@ export async function POST(req: Request) {
                     functionName: 'verifyAndRelease',
                     args: [BigInt(campaignId), creatorAddress as `0x${string}`, true, BigInt(result.payoutPercent || 0)],
                     account,
+                    gas: BigInt(3000000) // Explicit gas limit to prevent Cronos floor gas errors
                 });
                 console.log(`[AI Agent] 💰 PAYOUT TX: ${txHash}`);
             } catch (err: any) {
